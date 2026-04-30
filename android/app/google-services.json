@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "240906221215",
+    "firebase_url": "https://medi-tracker-f8eab-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "medi-tracker-f8eab",
+    "storage_bucket": "medi-tracker-f8eab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:240906221215:android:e0eac88d34910e4de9d4aa",
+        "android_client_info": {
+          "package_name": "com.example.medi_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCi5mpxc3sbyYmqu5pNoBdOBAcbokO6xGA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
