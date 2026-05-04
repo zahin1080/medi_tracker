@@ -3,6 +3,7 @@ import 'package:medi_tracker/basicloginpage.dart';
 import 'package:medi_tracker/patientbutton/medicineinventorypage.dart';
 import 'package:medi_tracker/patientbutton/uploadprescriptionpage.dart';
 import 'package:medi_tracker/patientbutton/medicinereminderpage.dart';
+import 'package:medi_tracker/patientbutton/doctorsinfopage.dart';
 
 class PatientHomePage extends StatelessWidget {
   const PatientHomePage({super.key});
@@ -11,7 +12,7 @@ class PatientHomePage extends StatelessWidget {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
-      (route) => false,
+          (route) => false,
     );
   }
 
@@ -82,12 +83,22 @@ class PatientHomePage extends StatelessWidget {
           );
         },
       ),
+
+      // ✅ CONNECTED BUTTON HERE
       _DashboardItem(
         title: 'Doctors Info',
         subtitle: 'View doctors',
         icon: Icons.medical_information_outlined,
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const DoctorsInfoPage(),
+            ),
+          );
+        },
       ),
+
       _DashboardItem(
         title: 'Consultation',
         subtitle: 'Book session',
@@ -123,15 +134,28 @@ class PatientHomePage extends StatelessWidget {
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: TextButton(
-                    onPressed: () => confirmLogout(context),
-                    child: const Text(
-                      'Logout',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                  child: InkWell(
+                    onTap: () => confirmLogout(context),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.logout,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -205,9 +229,8 @@ class PatientHomePage extends StatelessWidget {
                           children: [
                             CircleAvatar(
                               radius: 28,
-                              backgroundColor: const Color(
-                                0xFF8E6FF7,
-                              ).withOpacity(0.12),
+                              backgroundColor:
+                              const Color(0xFF8E6FF7).withOpacity(0.12),
                               child: Icon(
                                 item.icon,
                                 size: 30,

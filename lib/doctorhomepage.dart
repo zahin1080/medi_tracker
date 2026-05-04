@@ -9,7 +9,7 @@ class DoctorHomePage extends StatelessWidget {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
-      (route) => false,
+          (route) => false,
     );
   }
 
@@ -53,18 +53,6 @@ class DoctorHomePage extends StatelessWidget {
         },
       ),
       _DoctorDashboardItem(
-        title: 'Manage Chamber',
-        subtitle: 'Set chamber info',
-        icon: Icons.local_hospital_outlined,
-        onTap: () {},
-      ),
-      _DoctorDashboardItem(
-        title: 'Set Availability',
-        subtitle: 'Manage slots',
-        icon: Icons.schedule_outlined,
-        onTap: () {},
-      ),
-      _DoctorDashboardItem(
         title: 'Consultation Requests',
         subtitle: 'View requests',
         icon: Icons.assignment_outlined,
@@ -74,12 +62,6 @@ class DoctorHomePage extends StatelessWidget {
         title: 'Patient Prescriptions',
         subtitle: 'Review records',
         icon: Icons.description_outlined,
-        onTap: () {},
-      ),
-      _DoctorDashboardItem(
-        title: 'Emergency Chats',
-        subtitle: 'Urgent messages',
-        icon: Icons.warning_amber_rounded,
         onTap: () {},
       ),
     ];
@@ -108,22 +90,38 @@ class DoctorHomePage extends StatelessWidget {
                 ),
               ),
               centerTitle: true,
+
+              // 🔥 UPDATED LOGOUT UI HERE
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: TextButton(
-                    onPressed: () => confirmLogout(context),
-                    child: const Text(
-                      'Logout',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                  child: InkWell(
+                    onTap: () => confirmLogout(context),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.logout,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
+
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -193,9 +191,8 @@ class DoctorHomePage extends StatelessWidget {
                           children: [
                             CircleAvatar(
                               radius: 28,
-                              backgroundColor: const Color(
-                                0xFF2F80ED,
-                              ).withOpacity(0.12),
+                              backgroundColor:
+                              const Color(0xFF2F80ED).withOpacity(0.12),
                               child: Icon(
                                 item.icon,
                                 size: 30,

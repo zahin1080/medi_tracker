@@ -157,12 +157,6 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
           child: Image.network(
             imageUrl,
             fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return const Padding(
-                padding: EdgeInsets.all(30),
-                child: Text('Unable to load image'),
-              );
-            },
           ),
         ),
       ),
@@ -172,9 +166,8 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
   void showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -196,13 +189,13 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
         onPressed: isUploading ? null : pickAndUploadImage,
         icon: isUploading
             ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 2,
+          ),
+        )
             : const Icon(Icons.upload_file),
         label: Text(isUploading ? 'Uploading...' : 'Upload Image'),
       ),
@@ -210,97 +203,95 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
           ? const Center(child: CircularProgressIndicator())
           : prescriptions.isEmpty
           ? const Center(
-              child: Text(
-                'No prescription uploaded yet',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-            )
+        child: Text(
+          'No prescription uploaded yet',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      )
           : GridView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: prescriptions.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 14,
-                childAspectRatio: 0.78,
-              ),
-              itemBuilder: (context, index) {
-                final prescription = prescriptions[index];
-                final imageUrl = prescription['image_url'] ?? '';
+        padding: const EdgeInsets.all(16),
+        itemCount: prescriptions.length,
+        gridDelegate:
+        const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          childAspectRatio: 0.78,
+        ),
+        itemBuilder: (context, index) {
+          final prescription = prescriptions[index];
+          final imageUrl = prescription['image_url'] ?? '';
 
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFEDE8FF)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12.withOpacity(0.06),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border:
+              Border.all(color: const Color(0xFFEDE8FF)),
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      showImagePreview(imageUrl);
+                    },
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(18),
                       ),
-                    ],
+                      child: Image.network(
+                        imageUrl,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   ),
-                  child: Column(
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  child: Row(
                     children: [
                       Expanded(
-                        child: GestureDetector(
-                          onTap: () {
+                        child: OutlinedButton(
+                          onPressed: () {
                             showImagePreview(imageUrl);
                           },
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(18),
-                            ),
-                            child: Image.network(
-                              imageUrl,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Center(
-                                  child: Icon(
-                                    Icons.broken_image_outlined,
-                                    size: 45,
-                                    color: Colors.grey,
-                                  ),
-                                );
-                              },
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'View',
+                              style: TextStyle(fontSize: 14),
                             ),
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  showImagePreview(imageUrl);
-                                },
-                                child: const Text('View'),
-                              ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            confirmDelete(prescription);
+                          },
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Delete',
+                              style: TextStyle(fontSize: 14),
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  confirmDelete(prescription);
-                                },
-                                child: const Text('Delete'),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+              ],
             ),
+          );
+        },
+      ),
     );
   }
 }
