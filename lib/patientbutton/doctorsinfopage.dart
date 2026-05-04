@@ -36,23 +36,18 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
     });
 
     try {
-      final data = await supabase.from('doctor_profiles').select('''
-            user_id,
-            phone,
-            bmdc_code,
-            mbbs_completion_campus,
-            specialization,
-            additional_degrees,
-            chamber_addresses,
-            available_days,
-            availability_start_time,
-            availability_end_time,
-            zoom_meeting_link,
-            user_profiles(full_name, email)
-          ''');
+      final data = await supabase.rpc('get_doctors_for_patient');
+
+      final mergedDoctors =
+      List<Map<String, dynamic>>.from(data).map((doctor) {
+        doctor['doctor_name'] = doctor['full_name'] ?? 'Unknown Doctor';
+        doctor['doctor_email'] = doctor['email'] ?? 'Not added';
+
+        return doctor;
+      }).toList();
 
       setState(() {
-        doctors = List<Map<String, dynamic>>.from(data);
+        doctors = mergedDoctors;
       });
     } catch (e) {
       showMessage('Failed to load doctors: $e');
@@ -166,10 +161,8 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
         itemCount: doctors.length,
         itemBuilder: (context, index) {
           final doctor = doctors[index];
-          final userProfile = doctor['user_profiles'];
-
           final doctorName =
-              userProfile?['full_name'] ?? 'Unknown Doctor';
+              doctor['doctor_name'] ?? 'Unknown Doctor';
 
           return Container(
             margin: const EdgeInsets.only(bottom: 14),

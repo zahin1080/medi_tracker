@@ -31,19 +31,7 @@ class _ConsultationRequestsPageState extends State<ConsultationRequestsPage> {
         throw Exception('Doctor is not logged in');
       }
 
-      final data = await supabase
-          .from('consultation_requests')
-          .select('''
-            id,
-            patient_user_id,
-            doctor_user_id,
-            status,
-            zoom_meeting_link,
-            created_at,
-            user_profiles!consultation_requests_patient_user_id_fkey(full_name, email)
-          ''')
-          .eq('doctor_user_id', currentUser.id)
-          .order('created_at', ascending: false);
+      final data = await supabase.rpc('get_consultation_requests_for_doctor');
 
       setState(() {
         requests = List<Map<String, dynamic>>.from(data);
@@ -51,17 +39,20 @@ class _ConsultationRequestsPageState extends State<ConsultationRequestsPage> {
     } catch (e) {
       showMessage('Failed to load requests: $e');
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> acceptRequest(Map<String, dynamic> request) async {
     try {
-      await supabase.from('consultation_requests').update({
-        'status': 'accepted',
-      }).eq('id', request['id']);
+      await supabase
+          .from('consultation_requests')
+          .update({'status': 'accepted'})
+          .eq('id', request['id']);
 
       await fetchRequests();
       showMessage('Request accepted. Patient will join the meeting.');
@@ -72,9 +63,10 @@ class _ConsultationRequestsPageState extends State<ConsultationRequestsPage> {
 
   Future<void> rejectRequest(Map<String, dynamic> request) async {
     try {
-      await supabase.from('consultation_requests').update({
-        'status': 'rejected',
-      }).eq('id', request['id']);
+      await supabase
+          .from('consultation_requests')
+          .update({'status': 'rejected'})
+          .eq('id', request['id']);
 
       await fetchRequests();
       showMessage('Request rejected');
@@ -95,6 +87,12 @@ class _ConsultationRequestsPageState extends State<ConsultationRequestsPage> {
     if (status == 'accepted') return Colors.green;
     if (status == 'rejected') return Colors.red;
     return Colors.orange;
+  }
+
+  String statusText(String status) {
+    if (status == 'accepted') return 'Accepted';
+    if (status == 'rejected') return 'Rejected';
+    return 'Pending';
   }
 
   @override
@@ -122,80 +120,85 @@ class _ConsultationRequestsPageState extends State<ConsultationRequestsPage> {
           style: TextStyle(color: Colors.grey),
         ),
       )
-          : ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: requests.length,
-        itemBuilder: (context, index) {
-          final request = requests[index];
-          final patient = request['user_profiles'];
-          final status = request['status'] ?? 'pending';
+          : RefreshIndicator(
+        onRefresh: fetchRequests,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: requests.length,
+          itemBuilder: (context, index) {
+            final request = requests[index];
+            final status = request['status'] ?? 'pending';
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE2ECFF)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12.withOpacity(0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  patient?['full_name'] ?? 'Unknown Patient',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2ECFF)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12.withOpacity(0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text('Email: ${patient?['email'] ?? 'Not found'}'),
-                const SizedBox(height: 8),
-                Text(
-                  'Status: $status',
-                  style: TextStyle(
-                    color: statusColor(status),
-                    fontWeight: FontWeight.bold,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    request['patient_name'] ?? 'Unknown Patient',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                if (status == 'pending')
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            acceptRequest(request);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2F80ED),
-                            foregroundColor: Colors.white,
+                  const SizedBox(height: 6),
+                  Text(
+                    'Email: ${request['patient_email'] ?? 'Not found'}',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Status: ${statusText(status)}',
+                    style: TextStyle(
+                      color: statusColor(status),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (status == 'pending')
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              acceptRequest(request);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                              const Color(0xFF2F80ED),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Accept'),
                           ),
-                          child: const Text('Accept'),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            rejectRequest(request);
-                          },
-                          child: const Text('Reject'),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              rejectRequest(request);
+                            },
+                            child: const Text('Reject'),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          );
-        },
+                      ],
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:medi_tracker/basicloginpage.dart';
 import 'package:medi_tracker/doctorbutton/doctorprofilepage.dart';
+import 'package:medi_tracker/doctorbutton/consultationrequestspage.dart';
+import 'package:medi_tracker/doctorbutton/patientprescriptionspage.dart';
 
 class DoctorHomePage extends StatelessWidget {
   const DoctorHomePage({super.key});
@@ -56,13 +58,27 @@ class DoctorHomePage extends StatelessWidget {
         title: 'Consultation Requests',
         subtitle: 'View requests',
         icon: Icons.assignment_outlined,
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ConsultationRequestsPage(),
+            ),
+          );
+        },
       ),
       _DoctorDashboardItem(
         title: 'Patient Prescriptions',
         subtitle: 'Review records',
         icon: Icons.description_outlined,
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PatientPrescriptionsPage(),
+            ),
+          );
+        },
       ),
     ];
 
@@ -90,8 +106,6 @@ class DoctorHomePage extends StatelessWidget {
                 ),
               ),
               centerTitle: true,
-
-              // 🔥 UPDATED LOGOUT UI HERE
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
@@ -121,7 +135,6 @@ class DoctorHomePage extends StatelessWidget {
                   ),
                 ),
               ],
-
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -161,7 +174,6 @@ class DoctorHomePage extends StatelessWidget {
                 ),
               ),
             ),
-
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               sliver: SliverGrid(
