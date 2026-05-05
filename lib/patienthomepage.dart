@@ -4,11 +4,16 @@ import 'package:medi_tracker/patientbutton/medicineinventorypage.dart';
 import 'package:medi_tracker/patientbutton/uploadprescriptionpage.dart';
 import 'package:medi_tracker/patientbutton/medicinereminderpage.dart';
 import 'package:medi_tracker/patientbutton/doctorsinfopage.dart';
+import 'package:medi_tracker/supabase_config.dart';
 
 class PatientHomePage extends StatelessWidget {
   const PatientHomePage({super.key});
 
-  void logout(BuildContext context) {
+  Future<void> logout(BuildContext context) async {
+    await supabase.auth.signOut();
+
+    if (!context.mounted) return;
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -83,8 +88,6 @@ class PatientHomePage extends StatelessWidget {
           );
         },
       ),
-
-      // ✅ CONNECTED BUTTON HERE
       _DashboardItem(
         title: 'Doctors Info',
         subtitle: 'View doctors',
@@ -98,7 +101,6 @@ class PatientHomePage extends StatelessWidget {
           );
         },
       ),
-
       _DashboardItem(
         title: 'Consultation',
         subtitle: 'Book session',
@@ -199,7 +201,6 @@ class PatientHomePage extends StatelessWidget {
                 ),
               ),
             ),
-
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               sliver: SliverGrid(

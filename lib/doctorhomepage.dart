@@ -3,11 +3,16 @@ import 'package:medi_tracker/basicloginpage.dart';
 import 'package:medi_tracker/doctorbutton/doctorprofilepage.dart';
 import 'package:medi_tracker/doctorbutton/consultationrequestspage.dart';
 import 'package:medi_tracker/doctorbutton/patientprescriptionspage.dart';
+import 'package:medi_tracker/supabase_config.dart';
 
 class DoctorHomePage extends StatelessWidget {
   const DoctorHomePage({super.key});
 
-  void logout(BuildContext context) {
+  Future<void> logout(BuildContext context) async {
+    await supabase.auth.signOut();
+
+    if (!context.mounted) return;
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
