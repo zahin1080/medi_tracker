@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'basicloginpage.dart';
-import 'patientregpage.dart';
-import 'doctorregpage.dart';
+import '../patientpage/patientregpage.dart';
+import '../doctorpage/doctorregpage.dart';
 
 class RSelectionPage extends StatefulWidget {
   const RSelectionPage({super.key});

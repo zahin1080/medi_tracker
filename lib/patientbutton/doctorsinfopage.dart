@@ -15,6 +15,8 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
   bool isLoading = false;
   List<Map<String, dynamic>> doctors = [];
 
+  Map<String, bool> consultationSent = {};
+
   StreamSubscription? requestSubscription;
 
   @override
@@ -87,6 +89,8 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
         return;
       }
 
+      final doctorName = doctor['doctor_name'] ?? 'Unknown Doctor';
+
       await supabase.from('consultation_requests').insert({
         'patient_user_id': currentUser.id,
         'doctor_user_id': doctor['user_id'],
@@ -94,7 +98,13 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
         'zoom_meeting_link': doctor['zoom_meeting_link'],
       });
 
-      showMessage('Consultation request sent to doctor');
+      setState(() {
+        consultationSent[doctor['user_id'].toString()] = true;
+      });
+
+      showMessage(
+        'Consultation request sent to $doctorName. Calendly link is now available.',
+      );
     } catch (e) {
       showMessage('Failed to send request: $e');
     }
@@ -110,6 +120,24 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
       );
     } else {
       showMessage('Could not open Zoom meeting link');
+    }
+  }
+
+  Future<void> openCalendlyLink(String? link) async {
+    if (link == null || link.trim().isEmpty) {
+      showMessage('Calendly link is not available for this doctor');
+      return;
+    }
+
+    final uri = Uri.parse(link.trim());
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    } else {
+      showMessage('Could not open Calendly link');
     }
   }
 
@@ -163,6 +191,10 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
           final doctor = doctors[index];
           final doctorName =
               doctor['doctor_name'] ?? 'Unknown Doctor';
+
+          final doctorUserId = doctor['user_id'].toString();
+          final canOpenCalendly =
+              consultationSent[doctorUserId] == true;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
@@ -240,6 +272,27 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
                     ),
                     icon: const Icon(Icons.video_call),
                     label: const Text('Book Consultant'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: canOpenCalendly
+                        ? () {
+                      openCalendlyLink(
+                        doctor['calendly_link'],
+                      );
+                    }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: canOpenCalendly
+                          ? const Color(0xFF8E6FF7)
+                          : Colors.grey,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.calendar_month),
+                    label: const Text('Calendly Link'),
                   ),
                 ),
               ],

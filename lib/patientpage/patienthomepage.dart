@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:medi_tracker/basicloginpage.dart';
+import 'package:medi_tracker/authentications/basicloginpage.dart';
 import 'package:medi_tracker/patientbutton/medicineinventorypage.dart';
 import 'package:medi_tracker/patientbutton/uploadprescriptionpage.dart';
 import 'package:medi_tracker/patientbutton/medicinereminderpage.dart';
 import 'package:medi_tracker/patientbutton/doctorsinfopage.dart';
 import 'package:medi_tracker/supabase_config.dart';
 
-class PatientHomePage extends StatelessWidget {
+class PatientHomePage extends StatefulWidget {
   const PatientHomePage({super.key});
+
+  @override
+  State<PatientHomePage> createState() => _PatientHomePageState();
+}
+
+class _PatientHomePageState extends State<PatientHomePage> {
+  bool _isDialogOpen = false;
 
   Future<void> logout(BuildContext context) async {
     await supabase.auth.signOut();
@@ -22,28 +29,39 @@ class PatientHomePage extends StatelessWidget {
   }
 
   void confirmLogout(BuildContext context) {
+    if (_isDialogOpen) return;
+
+    _isDialogOpen = true;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Logout'),
-        content: const Text('Do you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              logout(context);
-            },
-            child: const Text('Yes'),
-          ),
-        ],
-      ),
-    );
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Do you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _isDialogOpen = false;
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('No'),
+            ),
+            TextButton(
+              onPressed: () async {
+                _isDialogOpen = false;
+                Navigator.pop(dialogContext);
+                await logout(context);
+              },
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      _isDialogOpen = false;
+    });
   }
 
   @override
@@ -101,22 +119,17 @@ class PatientHomePage extends StatelessWidget {
           );
         },
       ),
-      _DashboardItem(
-        title: 'Consultation',
-        subtitle: 'Book session',
-        icon: Icons.calendar_month_outlined,
-        onTap: () {},
-      ),
+
     ];
 
     return PopScope(
-      canPop: false,
+      canPop: true,
       onPopInvoked: (didPop) {
-        if (didPop) return;
-        confirmLogout(context);
+        return;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F7FF),
+
         body: CustomScrollView(
           slivers: [
             SliverAppBar(
@@ -133,35 +146,37 @@ class PatientHomePage extends StatelessWidget {
                 ),
               ),
               centerTitle: true,
+
               actions: [
                 Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: InkWell(
-                    onTap: () => confirmLogout(context),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(
-                          Icons.logout,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 10,
-                            fontStyle: FontStyle.italic,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                  padding: const EdgeInsets.only(right: 10),
+                  child: PopupMenuButton<String>(
+                    icon: const Icon(
+                      Icons.account_circle,
+                      color: Colors.green,
+                      size: 30,
                     ),
+                    onSelected: (value) {
+                      if (value == 'logout') {
+                        confirmLogout(context);
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                      PopupMenuItem(
+                        value: 'logout',
+                        child: Row(
+                          children: [
+                            Icon(Icons.logout, color: Colors.red),
+                            SizedBox(width: 10),
+                            Text('Logout'),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
+
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -191,7 +206,6 @@ class PatientHomePage extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.white70,
-                              height: 1.3,
                             ),
                           ),
                         ],
@@ -201,73 +215,73 @@ class PatientHomePage extends StatelessWidget {
                 ),
               ),
             ),
+
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final item = items[index];
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                    final item = items[index];
 
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: item.onTap,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFEDE8FF)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black12.withOpacity(0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircleAvatar(
-                              radius: 28,
-                              backgroundColor:
-                              const Color(0xFF8E6FF7).withOpacity(0.12),
-                              child: Icon(
-                                item.icon,
-                                size: 30,
-                                color: const Color(0xFF7B5EF2),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              item.title,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF111111),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.subtitle,
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF777777),
-                              ),
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: item.onTap,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFEDE8FF)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black12.withOpacity(0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
                             ),
                           ],
                         ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 28,
+                                backgroundColor:
+                                const Color(0xFF8E6FF7).withOpacity(0.12),
+                                child: Icon(
+                                  item.icon,
+                                  size: 30,
+                                  color: const Color(0xFF7B5EF2),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                item.title,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                item.subtitle,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                }, childCount: items.length),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    );
+                  },
+                  childCount: items.length,
+                ),
+                gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,

@@ -1,4 +1,4 @@
-package com.example.medi_tracker
+package com.example.meditracker
 
 import io.flutter.embedding.android.FlutterActivity
 

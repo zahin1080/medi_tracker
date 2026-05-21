@@ -1,22 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:medi_tracker/authentications/basicloginpage.dart';
 import 'package:medi_tracker/supabase_config.dart';
-import 'basicloginpage.dart';
 
-class PatientRegPage extends StatefulWidget {
-  const PatientRegPage({super.key});
+class DoctorRegPage extends StatefulWidget {
+  const DoctorRegPage({super.key});
 
   @override
-  State<PatientRegPage> createState() => _PatientRegPageState();
+  State<DoctorRegPage> createState() => _DoctorRegPageState();
 }
 
-class _PatientRegPageState extends State<PatientRegPage> {
+class _DoctorRegPageState extends State<DoctorRegPage> {
   final _formKey = GlobalKey<FormState>();
 
   final nameController = TextEditingController();
   final emailController = TextEditingController();
-  final phoneController = TextEditingController();
-  final bloodGroupController = TextEditingController();
-  final ageController = TextEditingController();
+  final bmdcController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
@@ -32,15 +30,13 @@ class _PatientRegPageState extends State<PatientRegPage> {
   void dispose() {
     nameController.dispose();
     emailController.dispose();
-    phoneController.dispose();
-    bloodGroupController.dispose();
-    ageController.dispose();
+    bmdcController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> registerPatient() async {
+  Future<void> registerDoctor() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -50,48 +46,37 @@ class _PatientRegPageState extends State<PatientRegPage> {
     try {
       final fullName = nameController.text.trim();
       final email = emailController.text.trim();
-      final phone = phoneController.text.trim();
-      final bloodGroup = bloodGroupController.text.trim().toUpperCase();
-      final age = int.parse(ageController.text.trim());
+      final bmdcCode = bmdcController.text.trim();
       final password = passwordController.text.trim();
 
       final authResponse = await supabase.auth.signUp(
         email: email,
         password: password,
+        emailRedirectTo:
+        'com.example.meditracker://login-callback/',
+        data: {
+          'full_name': fullName,
+          'role': 'doctor',
+          'bmdc_code': bmdcCode,
+        },
       );
 
-      final user = authResponse.user;
+      final currentUser = authResponse.user;
 
-      if (user == null) {
-        throw Exception('User account could not be created');
+      if (currentUser == null) {
+        throw Exception('Doctor registration failed.');
       }
-
-      await supabase.from('user_profiles').insert({
-        'id': user.id,
-        'full_name': fullName,
-        'email': email,
-        'role': 'patient',
-        'account_status': 'active',
-        'profile_completion_status': true,
-        'is_active': true,
-      });
-
-      await supabase.from('patient_profiles').insert({
-        'user_id': user.id,
-        'phone': phone,
-        'blood_group': bloodGroup,
-        'age': age,
-        'medical_history': null,
-        'previous_conditions': <String>[],
-      });
 
       if (!mounted) return;
 
       showDialog(
         context: context,
+        barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: const Text('Success'),
-          content: const Text('Patient registration completed successfully.'),
+          title: const Text('Verify Email'),
+          content: const Text(
+            'A verification email has been sent to your email address.\n\nPlease verify your email before login.',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -134,7 +119,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
         borderSide: BorderSide(color: Color(0xFFE5E5E5)),
       ),
       focusedBorder: const UnderlineInputBorder(
-        borderSide: BorderSide(color: Color(0xFF8E6FF7), width: 2),
+        borderSide: BorderSide(color: Color(0xFF2F80ED), width: 2),
       ),
       errorBorder: const UnderlineInputBorder(
         borderSide: BorderSide(color: Colors.red),
@@ -158,7 +143,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
               width: 48,
               height: 48,
               decoration: const BoxDecoration(
-                color: Color(0xFF8E6FF7),
+                color: Color(0xFF2F80ED),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(30),
                   topRight: Radius.circular(30),
@@ -174,7 +159,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
               width: 48,
               height: 48,
               decoration: const BoxDecoration(
-                color: Color(0xFF9B82F7),
+                color: Color(0xFF5DA2FF),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(30),
                   topRight: Radius.circular(30),
@@ -190,7 +175,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
               width: 36,
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFF7B5EF2).withOpacity(0.65),
+                color: const Color(0xFF1C5FD4).withOpacity(0.65),
                 borderRadius: const BorderRadius.all(Radius.circular(30)),
               ),
             ),
@@ -202,7 +187,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
               width: 32,
               height: 32,
               decoration: const BoxDecoration(
-                color: Color(0xFF7B5EF2),
+                color: Color(0xFF1C5FD4),
                 shape: BoxShape.circle,
               ),
             ),
@@ -273,7 +258,6 @@ class _PatientRegPageState extends State<PatientRegPage> {
             size: 72,
             color: const Color(0xFFFFD7D2).withOpacity(0.6),
           ),
-
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 30),
@@ -283,11 +267,10 @@ class _PatientRegPageState extends State<PatientRegPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
-
                     IconButton(
                       icon: const Icon(
                         Icons.arrow_back_ios_new,
-                        color: Color(0xFF7B5EF2),
+                        color: Color(0xFF2F80ED),
                       ),
                       onPressed: () {
                         Navigator.pushReplacement(
@@ -298,15 +281,11 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         );
                       },
                     ),
-
                     const SizedBox(height: 35),
-
                     topDecorationLogo(),
-
                     const SizedBox(height: 28),
-
                     const Text(
-                      'Patient Register',
+                      'Doctor Register',
                       style: TextStyle(
                         fontSize: 31,
                         fontWeight: FontWeight.w800,
@@ -315,19 +294,17 @@ class _PatientRegPageState extends State<PatientRegPage> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Create your patient account',
+                      'Create your doctor account',
                       style: TextStyle(
                         fontSize: 20,
                         color: Color(0xFF777777),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-
                     const SizedBox(height: 32),
-
                     TextFormField(
                       controller: nameController,
-                      decoration: underlineDecoration('PATIENT NAME'),
+                      decoration: underlineDecoration('DOCTOR NAME'),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Enter name';
@@ -335,9 +312,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 22),
-
                     TextFormField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -353,9 +328,18 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 22),
-
+                    TextFormField(
+                      controller: bmdcController,
+                      decoration: underlineDecoration('BMDC CODE'),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Enter BMDC code';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 22),
                     TextFormField(
                       controller: passwordController,
                       obscureText: obscurePassword,
@@ -386,9 +370,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 6),
-
                     const Text(
                       '8 characters minimum, with at least 1 special character and 1 number',
                       style: TextStyle(
@@ -397,9 +379,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         height: 1.3,
                       ),
                     ),
-
                     const SizedBox(height: 22),
-
                     TextFormField(
                       controller: confirmPasswordController,
                       obscureText: obscureConfirmPassword,
@@ -430,79 +410,18 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         return null;
                       },
                     ),
-
-                    const SizedBox(height: 22),
-
-                    TextFormField(
-                      controller: phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: underlineDecoration('PHONE NUMBER'),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Enter phone number';
-                        }
-                        if (value.trim().length < 10) {
-                          return 'Enter valid phone number';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    TextFormField(
-                      controller: bloodGroupController,
-                      decoration: underlineDecoration('BLOOD GROUP'),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Enter blood group';
-                        }
-                        final allowed = [
-                          'A+',
-                          'A-',
-                          'B+',
-                          'B-',
-                          'AB+',
-                          'AB-',
-                          'O+',
-                          'O-',
-                        ];
-                        if (!allowed.contains(value.trim().toUpperCase())) {
-                          return 'Invalid blood group';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    TextFormField(
-                      controller: ageController,
-                      keyboardType: TextInputType.number,
-                      decoration: underlineDecoration('AGE'),
-                      validator: (value) {
-                        final age = int.tryParse(value ?? '');
-                        if (age == null || age <= 0) {
-                          return 'Enter valid age';
-                        }
-                        return null;
-                      },
-                    ),
-
                     const SizedBox(height: 34),
-
                     SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: isLoading ? null : registerPatient,
+                        onPressed: isLoading ? null : registerDoctor,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8E6FF7),
+                          backgroundColor: const Color(0xFF2F80ED),
                           foregroundColor: Colors.white,
                           elevation: 4,
-                          shadowColor: const Color(
-                            0xFF8E6FF7,
-                          ).withOpacity(0.45),
+                          shadowColor:
+                          const Color(0xFF2F80ED).withOpacity(0.45),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -517,9 +436,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 22),
-
                     Center(
                       child: GestureDetector(
                         onTap: () {
@@ -533,13 +450,12 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         child: const Text(
                           'Already have an account? Sign in',
                           style: TextStyle(
-                            color: Color(0xFF7B5EF2),
+                            color: Color(0xFF2F80ED),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 30),
                   ],
                 ),

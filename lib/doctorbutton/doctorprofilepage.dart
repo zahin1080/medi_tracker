@@ -15,6 +15,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   final phoneController = TextEditingController();
   final specializationController = TextEditingController();
   final mbbsController = TextEditingController();
+  final calendlyController = TextEditingController();
 
   final degreeController = TextEditingController();
   final chamberAddressController = TextEditingController();
@@ -50,6 +51,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     phoneController.dispose();
     specializationController.dispose();
     mbbsController.dispose();
+    calendlyController.dispose();
     degreeController.dispose();
     chamberAddressController.dispose();
     super.dispose();
@@ -81,6 +83,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
       phoneController.text = doctorData['phone'] ?? '';
       specializationController.text = doctorData['specialization'] ?? '';
       mbbsController.text = doctorData['mbbs_completion_campus'] ?? '';
+      calendlyController.text = doctorData['calendly_link'] ?? '';
 
       degrees = List<String>.from(doctorData['additional_degrees'] ?? []);
       chamberAddresses =
@@ -210,6 +213,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
         'available_days': selectedDays,
         'availability_start_time': formatTimeForDatabase(startTime),
         'availability_end_time': formatTimeForDatabase(endTime),
+        'calendly_link': calendlyController.text.trim(),
       })
           .eq('user_id', user.id);
 
@@ -260,7 +264,6 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                 decoration: const InputDecoration(labelText: "Name"),
               ),
               const SizedBox(height: 10),
-
               TextFormField(
                 controller: phoneController,
                 decoration: const InputDecoration(
@@ -268,7 +271,6 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                 ),
               ),
               const SizedBox(height: 10),
-
               TextFormField(
                 controller: specializationController,
                 decoration: const InputDecoration(
@@ -276,16 +278,21 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                 ),
               ),
               const SizedBox(height: 10),
-
               TextFormField(
                 controller: mbbsController,
                 decoration: const InputDecoration(
                   labelText: "MBBS Institution",
                 ),
               ),
-
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: calendlyController,
+                decoration: const InputDecoration(
+                  labelText: "Calendly Link",
+                  hintText: "https://calendly.com/your-link",
+                ),
+              ),
               sectionTitle("Degrees"),
-
               Row(
                 children: [
                   Expanded(
@@ -302,7 +309,6 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   ),
                 ],
               ),
-
               ...degrees.asMap().entries.map((entry) {
                 return ListTile(
                   title: Text(entry.value),
@@ -312,9 +318,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   ),
                 );
               }),
-
               sectionTitle("Chamber Address"),
-
               Row(
                 children: [
                   Expanded(
@@ -331,7 +335,6 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   ),
                 ],
               ),
-
               ...chamberAddresses.asMap().entries.map((entry) {
                 return ListTile(
                   leading: const Icon(Icons.location_on_outlined),
@@ -342,14 +345,11 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   ),
                 );
               }),
-
               sectionTitle("Set Availability"),
-
               const Text(
                 "Select available days",
                 style: TextStyle(fontWeight: FontWeight.w500),
               ),
-
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -365,9 +365,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   );
                 }).toList(),
               ),
-
               const SizedBox(height: 16),
-
               Row(
                 children: [
                   Expanded(
@@ -395,9 +393,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 30),
-
               ElevatedButton(
                 onPressed: saveProfile,
                 child: const Text("Save Profile"),

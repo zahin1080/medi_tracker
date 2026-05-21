@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
-import 'package:medi_tracker/basicloginpage.dart';
-import 'package:medi_tracker/patienthomepage.dart';
-import 'package:medi_tracker/doctorhomepage.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:medi_tracker/authentications/basicloginpage.dart';
+import 'package:medi_tracker/doctorpage/doctorhomepage.dart';
+import 'package:medi_tracker/patientpage/patienthomepage.dart';
 import 'package:medi_tracker/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:medi_tracker/authentications/resetpasswordpage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,14 +20,141 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+bool isResetPasswordFlow = false;
+
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final AppLinks appLinks = AppLinks();
+  StreamSubscription<Uri>? linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    listenForDeepLinks();
+  }
+
+  void listenForDeepLinks() {
+    linkSubscription = appLinks.uriLinkStream.listen(
+          (Uri uri) async {
+        await handleRecoveryLink(uri);
+      },
+      onError: (error) {
+        debugPrint('Deep link error: $error');
+      },
+    );
+  }
+
+  Future<void> handleRecoveryLink(Uri uri) async {
+    debugPrint('Received URI: $uri');
+
+    if (uri.scheme == 'com.example.meditracker' &&
+        uri.host == 'login-callback') {
+      try {
+        isResetPasswordFlow = true;
+
+        await supabase.auth.getSessionFromUrl(uri);
+
+        navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => const ResetPasswordPage(),
+          ),
+              (route) => false,
+        );
+      } catch (e) {
+        debugPrint('Recovery session error: $e');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      home: AuthSessionChecker(),
+      home: const AppStartPage(),
+    );
+  }
+}
+
+class AppStartPage extends StatefulWidget {
+  const AppStartPage({super.key});
+
+  @override
+  State<AppStartPage> createState() => _AppStartPageState();
+}
+
+class _AppStartPageState extends State<AppStartPage> {
+  final AppLinks appLinks = AppLinks();
+
+  @override
+  void initState() {
+    super.initState();
+    startApp();
+  }
+
+  Future<void> startApp() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    try {
+      final Uri? initialUri = await appLinks.getInitialLink();
+
+      if (initialUri != null &&
+          initialUri.scheme == 'com.example.meditracker' &&
+          initialUri.host == 'login-callback') {
+        isResetPasswordFlow = true;
+
+        await supabase.auth.getSessionFromUrl(initialUri);
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ResetPasswordPage(),
+          ),
+        );
+
+        return;
+      }
+    } catch (e) {
+      debugPrint('Initial recovery link error: $e');
+    }
+
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AuthSessionChecker(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF8E6FF7),
+        ),
+      ),
     );
   }
 }
@@ -44,6 +174,10 @@ class _AuthSessionCheckerState extends State<AuthSessionChecker> {
   }
 
   Future<void> checkLoginSession() async {
+    if (isResetPasswordFlow) {
+      return;
+    }
+
     await Future.delayed(const Duration(milliseconds: 600));
 
     final session = supabase.auth.currentSession;
@@ -82,15 +216,21 @@ class _AuthSessionCheckerState extends State<AuthSessionChecker> {
       if (role == 'patient') {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const PatientHomePage()),
+          MaterialPageRoute(
+            builder: (context) => const PatientHomePage(),
+          ),
         );
       } else if (role == 'doctor') {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DoctorHomePage()),
+          MaterialPageRoute(
+            builder: (context) => const DoctorHomePage(),
+          ),
         );
       } else {
         await supabase.auth.signOut();
+
+        if (!mounted) return;
 
         Navigator.pushReplacement(
           context,

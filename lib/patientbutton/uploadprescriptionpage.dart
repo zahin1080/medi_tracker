@@ -6,10 +6,12 @@ class UploadPrescriptionPage extends StatefulWidget {
   const UploadPrescriptionPage({super.key});
 
   @override
-  State<UploadPrescriptionPage> createState() => _UploadPrescriptionPageState();
+  State<UploadPrescriptionPage> createState() =>
+      _UploadPrescriptionPageState();
 }
 
-class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
+class _UploadPrescriptionPageState
+    extends State<UploadPrescriptionPage> {
   bool isLoading = false;
   bool isUploading = false;
 
@@ -72,7 +74,9 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
       });
 
       final bytes = await pickedImage.readAsBytes();
+
       final fileExtension = pickedImage.name.split('.').last;
+
       final fileName =
           '${currentUser.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
 
@@ -94,6 +98,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
       });
 
       await fetchPrescriptions();
+
       showMessage('Prescription uploaded successfully');
     } catch (e) {
       showMessage('Upload failed: $e');
@@ -106,18 +111,26 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
     }
   }
 
-  Future<void> deletePrescription(Map<String, dynamic> prescription) async {
+  Future<void> deletePrescription(
+      Map<String, dynamic> prescription,
+      ) async {
     try {
       final id = prescription['id'];
       final fileName = prescription['file_name'];
 
       if (fileName != null && fileName.toString().isNotEmpty) {
-        await supabase.storage.from('prescriptions').remove([fileName]);
+        await supabase.storage
+            .from('prescriptions')
+            .remove([fileName]);
       }
 
-      await supabase.from('prescription_images').delete().eq('id', id);
+      await supabase
+          .from('prescription_images')
+          .delete()
+          .eq('id', id);
 
       await fetchPrescriptions();
+
       showMessage('Prescription deleted successfully');
     } catch (e) {
       showMessage('Delete failed: $e');
@@ -129,7 +142,9 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Prescription'),
-        content: const Text('Do you want to delete this prescription image?'),
+        content: const Text(
+          'Do you want to delete this prescription image?',
+        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -140,6 +155,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
+
               deletePrescription(prescription);
             },
             child: const Text('Yes'),
@@ -152,12 +168,43 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
   void showImagePreview(String imageUrl) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => Dialog(
-        child: InteractiveViewer(
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-          ),
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -166,8 +213,9 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
   void showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -177,12 +225,16 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
       appBar: AppBar(
         title: const Text(
           'Upload Prescription',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: const Color(0xFF8E6FF7),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
+
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF8E6FF7),
         foregroundColor: Colors.white,
@@ -197,15 +249,23 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
           ),
         )
             : const Icon(Icons.upload_file),
-        label: Text(isUploading ? 'Uploading...' : 'Upload Image'),
+        label: Text(
+          isUploading ? 'Uploading...' : 'Upload Image',
+        ),
       ),
+
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+        child: CircularProgressIndicator(),
+      )
           : prescriptions.isEmpty
           ? const Center(
         child: Text(
           'No prescription uploaded yet',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey,
+          ),
         ),
       )
           : GridView.builder(
@@ -220,15 +280,19 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
         ),
         itemBuilder: (context, index) {
           final prescription = prescriptions[index];
-          final imageUrl = prescription['image_url'] ?? '';
+
+          final imageUrl =
+              prescription['image_url'] ?? '';
 
           return Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
-              border:
-              Border.all(color: const Color(0xFFEDE8FF)),
+              border: Border.all(
+                color: const Color(0xFFEDE8FF),
+              ),
             ),
+
             child: Column(
               children: [
                 Expanded(
@@ -236,10 +300,13 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
                     onTap: () {
                       showImagePreview(imageUrl);
                     },
+
                     child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
+                      borderRadius:
+                      const BorderRadius.vertical(
                         top: Radius.circular(18),
                       ),
+
                       child: Image.network(
                         imageUrl,
                         width: double.infinity,
@@ -248,11 +315,13 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
                     ),
                   ),
                 ),
+
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 8,
                   ),
+
                   child: Row(
                     children: [
                       Expanded(
@@ -260,26 +329,34 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
                           onPressed: () {
                             showImagePreview(imageUrl);
                           },
+
                           child: const FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
                               'View',
-                              style: TextStyle(fontSize: 14),
+                              style: TextStyle(
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ),
                       ),
+
                       const SizedBox(width: 12),
+
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () {
                             confirmDelete(prescription);
                           },
+
                           child: const FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
                               'Delete',
-                              style: TextStyle(fontSize: 14),
+                              style: TextStyle(
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ),

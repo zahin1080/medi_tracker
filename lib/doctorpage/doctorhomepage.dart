@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:medi_tracker/basicloginpage.dart';
+import 'package:medi_tracker/authentications/basicloginpage.dart';
 import 'package:medi_tracker/doctorbutton/doctorprofilepage.dart';
 import 'package:medi_tracker/doctorbutton/consultationrequestspage.dart';
 import 'package:medi_tracker/doctorbutton/patientprescriptionspage.dart';
 import 'package:medi_tracker/supabase_config.dart';
 
-class DoctorHomePage extends StatelessWidget {
+class DoctorHomePage extends StatefulWidget {
   const DoctorHomePage({super.key});
+
+  @override
+  State<DoctorHomePage> createState() => _DoctorHomePageState();
+}
+
+class _DoctorHomePageState extends State<DoctorHomePage> {
+  bool _isDialogOpen = false;
 
   Future<void> logout(BuildContext context) async {
     await supabase.auth.signOut();
@@ -21,28 +28,39 @@ class DoctorHomePage extends StatelessWidget {
   }
 
   void confirmLogout(BuildContext context) {
+    if (_isDialogOpen) return;
+
+    _isDialogOpen = true;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Logout'),
-        content: const Text('Do you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              logout(context);
-            },
-            child: const Text('Yes'),
-          ),
-        ],
-      ),
-    );
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Do you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _isDialogOpen = false;
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('No'),
+            ),
+            TextButton(
+              onPressed: () async {
+                _isDialogOpen = false;
+                Navigator.pop(dialogContext);
+                await logout(context);
+              },
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      _isDialogOpen = false;
+    });
   }
 
   @override
@@ -55,7 +73,9 @@ class DoctorHomePage extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const DoctorProfilePage()),
+            MaterialPageRoute(
+              builder: (context) => const DoctorProfilePage(),
+            ),
           );
         },
       ),
@@ -88,11 +108,8 @@ class DoctorHomePage extends StatelessWidget {
     ];
 
     return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (didPop) return;
-        confirmLogout(context);
-      },
+      canPop: true,
+      onPopInvoked: (didPop) {},
       child: Scaffold(
         backgroundColor: const Color(0xFFF4F8FF),
         body: CustomScrollView(
@@ -111,35 +128,35 @@ class DoctorHomePage extends StatelessWidget {
                 ),
               ),
               centerTitle: true,
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: InkWell(
-                    onTap: () => confirmLogout(context),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(
-                          Icons.logout,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 10,
-                            fontStyle: FontStyle.italic,
-                            fontWeight: FontWeight.bold,
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.account_circle,
+                        color: Colors.green,
+                        size: 30,
+                      ),
+                      onSelected: (value) {
+                        if (value == 'logout') {
+                          confirmLogout(context);
+                        }
+                      },
+                      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                        PopupMenuItem(
+                          value: 'logout',
+                          child: Row(
+                            children: [
+                              Icon(Icons.logout, color: Colors.red),
+                              SizedBox(width: 10),
+                              Text('Logout'),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -149,12 +166,12 @@ class DoctorHomePage extends StatelessWidget {
                       end: Alignment.bottomRight,
                     ),
                   ),
-                  child: SafeArea(
+                  child: const SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 70, 20, 20),
+                      padding: EdgeInsets.fromLTRB(20, 70, 20, 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Doctor Home',
                             style: TextStyle(
@@ -179,6 +196,7 @@ class DoctorHomePage extends StatelessWidget {
                 ),
               ),
             ),
+
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               sliver: SliverGrid(
@@ -220,23 +238,18 @@ class DoctorHomePage extends StatelessWidget {
                             Text(
                               item.title,
                               textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF111111),
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               item.subtitle,
                               textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF777777),
+                                color: Colors.grey,
                               ),
                             ),
                           ],
