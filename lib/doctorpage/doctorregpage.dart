@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:medi_tracker/authentications/basicloginpage.dart';
+import 'package:medi_tracker/authentications/otpverificationpage.dart';
 import 'package:medi_tracker/supabase_config.dart';
 
 class DoctorRegPage extends StatefulWidget {
@@ -52,8 +53,6 @@ class _DoctorRegPageState extends State<DoctorRegPage> {
       final authResponse = await supabase.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo:
-        'com.example.meditracker://login-callback/',
         data: {
           'full_name': fullName,
           'role': 'doctor',
@@ -69,34 +68,20 @@ class _DoctorRegPageState extends State<DoctorRegPage> {
 
       if (!mounted) return;
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Verify Email'),
-          content: const Text(
-            'A verification email has been sent to your email address.\n\nPlease verify your email before login.',
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OtpVerificationPage(
+            email: email,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                );
-              },
-              child: const Text('OK'),
-            ),
-          ],
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registration failed: $e')),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -395,7 +380,8 @@ class _DoctorRegPageState extends State<DoctorRegPage> {
                           ),
                           onPressed: () {
                             setState(() {
-                              obscureConfirmPassword = !obscureConfirmPassword;
+                              obscureConfirmPassword =
+                              !obscureConfirmPassword;
                             });
                           },
                         ),
@@ -420,8 +406,9 @@ class _DoctorRegPageState extends State<DoctorRegPage> {
                           backgroundColor: const Color(0xFF2F80ED),
                           foregroundColor: Colors.white,
                           elevation: 4,
-                          shadowColor:
-                          const Color(0xFF2F80ED).withOpacity(0.45),
+                          shadowColor: const Color(
+                            0xFF2F80ED,
+                          ).withOpacity(0.45),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),

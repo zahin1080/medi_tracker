@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:medi_tracker/supabase_config.dart';
 import 'package:medi_tracker/authentications/basicloginpage.dart';
+import 'package:medi_tracker/authentications/otpverificationpage.dart';
 
 class PatientRegPage extends StatefulWidget {
   const PatientRegPage({super.key});
@@ -58,8 +59,6 @@ class _PatientRegPageState extends State<PatientRegPage> {
       final authResponse = await supabase.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo:
-        'com.example.meditracker://login-callback/',
         data: {
           'full_name': fullName,
           'role': 'patient',
@@ -77,34 +76,20 @@ class _PatientRegPageState extends State<PatientRegPage> {
 
       if (!mounted) return;
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Verify Email'),
-          content: const Text(
-            'A verification email has been sent to your email address.\n\nPlease verify your email before login.',
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OtpVerificationPage(
+            email: email,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                );
-              },
-              child: const Text('OK'),
-            ),
-          ],
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registration failed: $e')),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -329,10 +314,13 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         if (value == null || value.trim().isEmpty) {
                           return 'Enter email';
                         }
+
                         final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+
                         if (!emailRegex.hasMatch(value.trim())) {
                           return 'Enter valid email';
                         }
+
                         return null;
                       },
                     ),
@@ -361,9 +349,11 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         if (value == null || value.isEmpty) {
                           return 'Enter password';
                         }
+
                         if (!passwordRegex.hasMatch(value)) {
                           return 'Password must meet the required format';
                         }
+
                         return null;
                       },
                     ),
@@ -392,7 +382,8 @@ class _PatientRegPageState extends State<PatientRegPage> {
                           ),
                           onPressed: () {
                             setState(() {
-                              obscureConfirmPassword = !obscureConfirmPassword;
+                              obscureConfirmPassword =
+                              !obscureConfirmPassword;
                             });
                           },
                         ),
@@ -401,9 +392,11 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         if (value == null || value.isEmpty) {
                           return 'Confirm password';
                         }
+
                         if (value != passwordController.text) {
                           return 'Passwords do not match';
                         }
+
                         return null;
                       },
                     ),
@@ -416,9 +409,11 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         if (value == null || value.trim().isEmpty) {
                           return 'Enter phone number';
                         }
+
                         if (value.trim().length < 10) {
                           return 'Enter valid phone number';
                         }
+
                         return null;
                       },
                     ),
@@ -430,6 +425,7 @@ class _PatientRegPageState extends State<PatientRegPage> {
                         if (value == null || value.trim().isEmpty) {
                           return 'Enter blood group';
                         }
+
                         final allowed = [
                           'A+',
                           'A-',
@@ -440,9 +436,11 @@ class _PatientRegPageState extends State<PatientRegPage> {
                           'O+',
                           'O-',
                         ];
+
                         if (!allowed.contains(value.trim().toUpperCase())) {
                           return 'Invalid blood group';
                         }
+
                         return null;
                       },
                     ),
@@ -453,9 +451,11 @@ class _PatientRegPageState extends State<PatientRegPage> {
                       decoration: underlineDecoration('AGE'),
                       validator: (value) {
                         final age = int.tryParse(value ?? '');
+
                         if (age == null || age <= 0) {
                           return 'Enter valid age';
                         }
+
                         return null;
                       },
                     ),
@@ -469,9 +469,8 @@ class _PatientRegPageState extends State<PatientRegPage> {
                           backgroundColor: const Color(0xFF8E6FF7),
                           foregroundColor: Colors.white,
                           elevation: 4,
-                          shadowColor: const Color(
-                            0xFF8E6FF7,
-                          ).withOpacity(0.45),
+                          shadowColor:
+                          const Color(0xFF8E6FF7).withOpacity(0.45),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),

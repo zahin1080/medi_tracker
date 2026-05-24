@@ -20,8 +20,6 @@ void main() async {
   runApp(const MyApp());
 }
 
-
-
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 bool isResetPasswordFlow = false;
@@ -109,7 +107,7 @@ class _AppStartPageState extends State<AppStartPage> {
   }
 
   Future<void> startApp() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 50));
 
     try {
       final Uri? initialUri = await appLinks.getInitialLink();
@@ -178,7 +176,7 @@ class _AuthSessionCheckerState extends State<AuthSessionChecker> {
       return;
     }
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future.delayed(const Duration(milliseconds: 50));
 
     final session = supabase.auth.currentSession;
 
