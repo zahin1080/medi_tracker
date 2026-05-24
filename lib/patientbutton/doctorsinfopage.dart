@@ -123,21 +123,31 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
     }
   }
 
-  Future<void> openCalendlyLink(String? link) async {
-    if (link == null || link.trim().isEmpty) {
-      showMessage('Calendly link is not available for this doctor');
-      return;
-    }
+  Future<void> openCalendlyLink(String link) async {
+    try {
+      String fixedLink = link.trim();
 
-    final uri = Uri.parse(link.trim());
+      if (!fixedLink.startsWith('http://') &&
+          !fixedLink.startsWith('https://')) {
+        fixedLink = 'https://$fixedLink';
+      }
 
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(
+      final Uri uri = Uri.parse(fixedLink);
+
+      final bool launched = await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
       );
-    } else {
-      showMessage('Could not open Calendly link');
+
+      if (!launched) {
+        throw Exception('Launch failed');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open Calendly link'),
+        ),
+      );
     }
   }
 
