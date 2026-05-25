@@ -54,7 +54,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
                 Navigator.pop(dialogContext);
                 await logout(context);
               },
-              child: const Text('Yes'),
+              child: const Text('Yes',style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -153,7 +153,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
                   child: PopupMenuButton<String>(
                     icon: const Icon(
                       Icons.account_circle,
-                      color: Colors.green,
+                      color: Colors.white70,
                       size: 30,
                     ),
                     onSelected: (value) {
@@ -168,7 +168,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
                           children: [
                             Icon(Icons.logout, color: Colors.red),
                             SizedBox(width: 10),
-                            Text('Logout'),
+                            Text('Logout', style: TextStyle(color: Colors.redAccent)),
                           ],
                         ),
                       ),

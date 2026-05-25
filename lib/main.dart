@@ -31,6 +31,10 @@ StreamSubscription<dynamic>? entrigAuthSubscription;
 StreamSubscription<dynamic>? entrigNotificationOpenSubscription;
 Future<void> registerCurrentUserForEntrig() async {
   try {
+    if (isResetPasswordFlow) {
+      debugPrint('Entrig registration skipped during reset password flow');
+      return;
+    }
     final currentUser = supabase.auth.currentUser;
 
     if (currentUser == null) return;
@@ -48,6 +52,10 @@ Future<void> registerCurrentUserForEntrig() async {
 void listenForEntrigAuthChanges() {
   entrigAuthSubscription = supabase.auth.onAuthStateChange.listen((data) async {
     try {
+      if (isResetPasswordFlow) {
+        debugPrint('Entrig auth change skipped during reset password flow');
+        return;
+      }
       final session = data.session;
       final user = session?.user;
 
@@ -292,9 +300,11 @@ class _AuthSessionCheckerState extends State<AuthSessionChecker> {
       return;
     }
     try {
+      if(!isResetPasswordFlow){
       await Entrig.register(
         userId: currentUser.id,
       );
+    }
       final profile = await supabase
           .from('user_profiles')
           .select('role')

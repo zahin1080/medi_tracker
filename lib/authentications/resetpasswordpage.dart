@@ -40,6 +40,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     setState(() {
       isLoading = true;
     });
+    isResetPasswordFlow = true;
 
     try {
       await supabase.auth.updateUser(
@@ -48,9 +49,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         ),
       );
 
-      isResetPasswordFlow = false;
+
 
       await supabase.auth.signOut();
+      isResetPasswordFlow = false;
 
       if (!mounted) return;
 
@@ -77,6 +79,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         ),
       );
     } catch (e) {
+      isResetPasswordFlow = true;
       showMessage('Failed: $e');
     } finally {
       if (mounted) {
