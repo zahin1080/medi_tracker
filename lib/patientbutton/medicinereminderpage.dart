@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:entrig/entrig.dart';
 import 'package:flutter/material.dart';
 import 'package:medi_tracker/supabase_config.dart';
 
@@ -14,10 +15,11 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
   bool isLoading = false;
   bool isSaving = false;
 
-  Timer? reminderCheckerTimer;
+  StreamSubscription<dynamic>? entrigNotificationSubscription;
 
   List<Map<String, dynamic>> medicines = [];
   List<Map<String, dynamic>> reminders = [];
+  List<Map<String, dynamic>> notificationLogs = [];
 
   Map<String, dynamic>? selectedMedicine;
   TimeOfDay? selectedTime;
@@ -25,27 +27,61 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
   final activeDaysController = TextEditingController();
   final totalDosesController = TextEditingController();
 
-  final Set<String> alreadyShownToday = {};
-
   @override
   void initState() {
     super.initState();
-    fetchData();
 
-    reminderCheckerTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      checkDueReminders();
-    });
+    registerDeviceForEntrig();
+    listenToEntrigNotificationTap();
+    fetchData();
   }
 
   @override
   void dispose() {
-    reminderCheckerTimer?.cancel();
+    entrigNotificationSubscription?.cancel();
     activeDaysController.dispose();
     totalDosesController.dispose();
     super.dispose();
   }
 
+  Future<void> registerDeviceForEntrig() async {
+    try {
+      final currentUser = supabase.auth.currentUser;
+
+      if (currentUser == null) return;
+
+      await Entrig.register(
+        userId: currentUser.id,
+      );
+    } catch (e) {
+      showMessage('Failed to register push notification: $e');
+    }
+  }
+
+  void listenToEntrigNotificationTap() {
+    entrigNotificationSubscription =
+        Entrig.onNotificationOpened.listen((event) async {
+          if (!mounted) return;
+
+          if (event.type == 'medicine_reminder') {
+            await fetchData();
+
+            if (!mounted) return;
+
+            await showNotificationLogsDialog();
+          }
+        });
+  }
+
+  int unseenNotificationCount() {
+    return notificationLogs.where((log) {
+      return log['is_seen'] == false;
+    }).length;
+  }
+
   Future<void> fetchData() async {
+    if (!mounted) return;
+
     setState(() {
       isLoading = true;
     });
@@ -67,18 +103,29 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
       final reminderData = await supabase
           .from('medicine_reminder_schedules')
           .select(
-            '*, medicine_inventory(medicine_name, dose_power, current_stock)',
-          )
+        '*, medicine_inventory(medicine_name, dose_power, current_stock)',
+      )
           .eq('patient_user_id', currentUser.id)
           .order('created_at', ascending: false);
+
+      final logsData = await supabase
+          .from('notification_logs')
+          .select()
+          .eq('patient_user_id', currentUser.id)
+          .order('created_at', ascending: false);
+
+      if (!mounted) return;
 
       setState(() {
         medicines = List<Map<String, dynamic>>.from(medicineData);
         reminders = List<Map<String, dynamic>>.from(reminderData);
+        notificationLogs = List<Map<String, dynamic>>.from(logsData);
       });
     } catch (e) {
       showMessage('Failed to load data: $e');
     } finally {
+      if (!mounted) return;
+
       setState(() {
         isLoading = false;
       });
@@ -101,6 +148,7 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
   String formatTime(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
+
     return '$hour:$minute';
   }
 
@@ -128,6 +176,8 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
       return;
     }
 
+    if (!mounted) return;
+
     setState(() {
       isSaving = true;
     });
@@ -147,6 +197,7 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
         'total_doses': totalDoses,
         'taken_doses': 0,
         'missed_doses': 0,
+        'start_date': DateTime.now().toIso8601String().substring(0, 10),
         'is_active': true,
       });
 
@@ -156,101 +207,47 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
       totalDosesController.clear();
 
       await fetchData();
-      showMessage('Reminder created successfully');
+
+      showMessage(
+        'Reminder created. Push notification will be sent at reminder time.',
+      );
     } catch (e) {
       showMessage('Failed to create reminder: $e');
     } finally {
+      if (!mounted) return;
+
       setState(() {
         isSaving = false;
       });
     }
   }
 
-  void checkDueReminders() {
-    if (!mounted || reminders.isEmpty) return;
+  Future<void> markAllNotificationsSeen() async {
+    try {
+      final currentUser = supabase.auth.currentUser;
 
-    final now = DateTime.now();
-    final todayKey =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      if (currentUser == null) return;
 
-    for (final reminder in reminders) {
-      final isActive = reminder['is_active'] ?? false;
-      if (!isActive) continue;
+      await supabase
+          .from('notification_logs')
+          .update({'is_seen': true})
+          .eq('patient_user_id', currentUser.id);
 
-      final reminderTime = reminder['reminder_time'] ?? '';
-      if (!reminderTime.contains(':')) continue;
-
-      final parts = reminderTime.split(':');
-      final reminderHour = int.tryParse(parts[0]);
-      final reminderMinute = int.tryParse(parts[1]);
-
-      if (reminderHour == null || reminderMinute == null) continue;
-
-      final dueTime = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        reminderHour,
-        reminderMinute,
-      );
-
-      final difference = now.difference(dueTime).inSeconds;
-
-      final uniqueKey = '${reminder['id']}-$todayKey';
-
-      if (difference >= 0 &&
-          difference <= 300 &&
-          !alreadyShownToday.contains(uniqueKey)) {
-        alreadyShownToday.add(uniqueKey);
-        showReminderDialog(reminder);
-      }
+      await fetchData();
+    } catch (e) {
+      showMessage('Failed to update notifications: $e');
     }
-  }
-
-  void showReminderDialog(Map<String, dynamic> reminder) {
-    final medicine = reminder['medicine_inventory'];
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        Timer(const Duration(minutes: 5), () {
-          if (Navigator.canPop(dialogContext)) {
-            Navigator.pop(dialogContext);
-            showMessage(
-              'You have missed your medicine: ${medicine?['medicine_name'] ?? 'Medicine'}',
-            );
-          }
-        });
-
-        return AlertDialog(
-          title: const Text('Medicine Reminder'),
-          content: Text(
-            'Time to take ${medicine?['medicine_name'] ?? 'your medicine'} (${medicine?['dose_power'] ?? ''}).',
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                confirmMedicineTaken(reminder);
-              },
-              child: const Text('I have taken it'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> confirmMedicineTaken(Map<String, dynamic> reminder) async {
     try {
-      final currentUser = supabase.auth.currentUser;
+      final medicine = reminder['medicine_inventory'];
 
-      if (currentUser == null) {
-        throw Exception('User is not logged in');
+      if (medicine == null) {
+        showMessage('Medicine details not found');
+        return;
       }
 
-      final medicine = reminder['medicine_inventory'];
       final currentStock = medicine['current_stock'] ?? 0;
 
       if (currentStock <= 0) {
@@ -261,39 +258,73 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
       final newStock = currentStock - 1;
       final newTakenDoses = (reminder['taken_doses'] ?? 0) + 1;
       final totalDoses = reminder['total_doses'] ?? 0;
+      final isFinished = newTakenDoses >= totalDoses;
 
       await supabase
           .from('medicine_inventory')
           .update({'current_stock': newStock})
           .eq('id', reminder['medicine_inventory_id']);
 
+      await supabase.from('medicine_reminder_schedules').update({
+        'taken_doses': newTakenDoses,
+        'is_active': isFinished ? false : true,
+      }).eq('id', reminder['id']);
+
       await supabase
-          .from('medicine_reminder_schedules')
+          .from('notification_logs')
           .update({
-            'taken_doses': newTakenDoses,
-            'is_active': newTakenDoses >= totalDoses ? false : true,
-          })
-          .eq('id', reminder['id']);
+        'is_taken': true,
+        'is_seen': true,
+      })
+          .eq('reminder_id', reminder['id']);
 
       await fetchData();
+
       showMessage('Medicine marked as taken');
     } catch (e) {
       showMessage('Failed to confirm dose: $e');
     }
   }
 
-  Future<void> deleteReminder(String id) async {
+  Future<void> markMedicineNotTaken(Map<String, dynamic> log) async {
     try {
-      await supabase.from('medicine_reminder_schedules').delete().eq('id', id);
+      await supabase
+          .from('notification_logs')
+          .update({
+        'is_taken': false,
+        'is_seen': true,
+      })
+          .eq('id', log['id']);
 
       await fetchData();
+
+      showMessage('Medicine marked as not taken');
+    } catch (e) {
+      showMessage('Failed to update notification: $e');
+    }
+  }
+
+  Future<void> deleteReminder(Map<String, dynamic> reminder) async {
+    try {
+      await supabase
+          .from('notification_logs')
+          .delete()
+          .eq('reminder_id', reminder['id']);
+
+      await supabase
+          .from('medicine_reminder_schedules')
+          .delete()
+          .eq('id', reminder['id']);
+
+      await fetchData();
+
       showMessage('Reminder deleted');
     } catch (e) {
       showMessage('Failed to delete reminder: $e');
     }
   }
 
-  void confirmDeleteReminder(String id) {
+  void confirmDeleteReminder(Map<String, dynamic> reminder) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -309,7 +340,7 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              deleteReminder(id);
+              deleteReminder(reminder);
             },
             child: const Text('Yes'),
           ),
@@ -318,12 +349,98 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
     );
   }
 
+  Future<void> showNotificationLogsDialog() async {
+    await markAllNotificationsSeen();
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reminder Notifications'),
+          content: notificationLogs.isEmpty
+              ? const Text('No notification messages available.')
+              : SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: notificationLogs.length,
+              itemBuilder: (context, index) {
+                final log = notificationLogs[index];
+                final isTaken = log['is_taken'] == true;
+
+                return ListTile(
+                  leading: Icon(
+                    isTaken
+                        ? Icons.check_circle
+                        : Icons.warning_amber_rounded,
+                    color: isTaken ? Colors.green : Colors.orange,
+                  ),
+                  title: Text(log['title'] ?? 'Medicine Reminder'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(log['body'] ?? ''),
+                      if (log['due_date'] != null ||
+                          log['due_time'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Due: ${log['due_date'] ?? ''} ${log['due_time'] ?? ''}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isTaken
+                          ? Colors.green.withOpacity(0.12)
+                          : Colors.red.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      isTaken ? 'Taken' : 'Not Taken',
+                      style: TextStyle(
+                        color: isTaken ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+
+    await fetchData();
+  }
+
   void showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Color getStatusColor(bool isActive) {
@@ -332,237 +449,253 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
 
   @override
   Widget build(BuildContext context) {
+    final unseenCount = unseenNotificationCount();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7FF),
       appBar: AppBar(
         title: const Text(
           'Medicine Reminder',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: const Color(0xFF8E6FF7),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications,
+                  color: Colors.white,
+                ),
+                onPressed: showNotificationLogsDialog,
+              ),
+              if (unseenCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      unseenCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFEDE8FF)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFEDE8FF)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12.withOpacity(0.06),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
+                const Text(
+                  'Create Reminder',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<Map<String, dynamic>>(
+                  value: selectedMedicine,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Medicine',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: medicines.map((medicine) {
+                    return DropdownMenuItem<Map<String, dynamic>>(
+                      value: medicine,
+                      child: Text(
+                        '${medicine['medicine_name']} (${medicine['dose_power']})',
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedMedicine = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: selectReminderTime,
+                  icon: const Icon(Icons.access_time),
+                  label: Text(
+                    selectedTime == null
+                        ? 'Select Reminder Time'
+                        : 'Time: ${selectedTime!.format(context)}',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: activeDaysController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Active for how many days?',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: totalDosesController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Total number of doses',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: isSaving ? null : addReminder,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8E6FF7),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(
+                      isSaving ? 'Saving...' : 'Create Reminder',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'Your Reminders',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (reminders.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 40),
+              child: Center(
+                child: Text(
+                  'No reminders created yet',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            ),
+          ...reminders.map((reminder) {
+            final medicine = reminder['medicine_inventory'];
+            final isActive = reminder['is_active'] ?? false;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFEDE8FF)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      const Text(
-                        'Create Reminder',
+                      CircleAvatar(
+                        backgroundColor:
+                        getStatusColor(isActive).withOpacity(0.12),
+                        child: Icon(
+                          Icons.alarm,
+                          color: getStatusColor(isActive),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          medicine?['medicine_name'] ?? 'Medicine',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        isActive ? 'Active' : 'Finished',
                         style: TextStyle(
-                          fontSize: 18,
+                          color: getStatusColor(isActive),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
-                      const SizedBox(height: 16),
-
-                      DropdownButtonFormField<Map<String, dynamic>>(
-                        value: selectedMedicine,
-                        decoration: const InputDecoration(
-                          labelText: 'Select Medicine',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: medicines.map((medicine) {
-                          return DropdownMenuItem<Map<String, dynamic>>(
-                            value: medicine,
-                            child: Text(
-                              '${medicine['medicine_name']} (${medicine['dose_power']})',
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedMedicine = value;
-                          });
-                        },
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      OutlinedButton.icon(
-                        onPressed: selectReminderTime,
-                        icon: const Icon(Icons.access_time),
-                        label: Text(
-                          selectedTime == null
-                              ? 'Select Reminder Time'
-                              : 'Time: ${selectedTime!.format(context)}',
-                        ),
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      TextField(
-                        controller: activeDaysController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Active for how many days?',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      TextField(
-                        controller: totalDosesController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Total number of doses',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text('Dose: ${medicine?['dose_power'] ?? ''}'),
+                  Text('Stock: ${medicine?['current_stock'] ?? 0}'),
+                  Text('Reminder Time: ${reminder['reminder_time']}'),
+                  Text(
+                    'Taken: ${reminder['taken_doses']} / ${reminder['total_doses']}',
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
                         child: ElevatedButton(
-                          onPressed: isSaving ? null : addReminder,
+                          onPressed: isActive
+                              ? () {
+                            confirmMedicineTaken(reminder);
+                          }
+                              : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF8E6FF7),
                             foregroundColor: Colors.white,
                           ),
-                          child: Text(
-                            isSaving ? 'Saving...' : 'Create Reminder',
-                          ),
+                          child: const Text('Taken'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            confirmDeleteReminder(reminder);
+                          },
+                          child: const Text('Delete'),
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 22),
-
-                const Text(
-                  'Your Reminders',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-
-                const SizedBox(height: 12),
-
-                if (reminders.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: Text(
-                        'No reminders created yet',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  ),
-
-                ...reminders.map((reminder) {
-                  final medicine = reminder['medicine_inventory'];
-                  final isActive = reminder['is_active'] ?? false;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFEDE8FF)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black12.withOpacity(0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: getStatusColor(
-                                isActive,
-                              ).withOpacity(0.12),
-                              child: Icon(
-                                Icons.alarm,
-                                color: getStatusColor(isActive),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                medicine?['medicine_name'] ?? 'Medicine',
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              isActive ? 'Active' : 'Finished',
-                              style: TextStyle(
-                                color: getStatusColor(isActive),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text('Dose: ${medicine?['dose_power'] ?? ''}'),
-                        Text('Stock: ${medicine?['current_stock'] ?? 0}'),
-                        Text('Reminder Time: ${reminder['reminder_time']}'),
-                        Text(
-                          'Taken: ${reminder['taken_doses']} / ${reminder['total_doses']}',
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: isActive
-                                    ? () {
-                                        confirmMedicineTaken(reminder);
-                                      }
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8E6FF7),
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Taken'),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  confirmDeleteReminder(reminder['id']);
-                                },
-                                child: const Text('Delete'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
+import 'package:entrig/entrig.dart';
 import 'package:flutter/material.dart';
 import 'package:medi_tracker/authentications/basicloginpage.dart';
 import 'package:medi_tracker/doctorpage/doctorhomepage.dart';
@@ -16,13 +17,104 @@ void main() async {
     anonKey:
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNyZ2Jvdmt3Y216end1eWthYXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NTY1MDgsImV4cCI6MjA5MjEzMjUwOH0.87k-s9478tiaUj0-hxPMcvTIqeUo3c0lDmAwCN0Wt3Q',
   );
-
+  await Entrig.init(apiKey: 'sk-proj-3d259f22-4c284b2926b3a263d6b8c0ad6711a57897bb4f441e646715dfbbca6c3bfaab5b');
+  await registerCurrentUserForEntrig();
+  listenForEntrigAuthChanges();
+  listenForEntrigNotificationOpen();
   runApp(const MyApp());
 }
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 bool isResetPasswordFlow = false;
+StreamSubscription<dynamic>? entrigAuthSubscription;
+StreamSubscription<dynamic>? entrigNotificationOpenSubscription;
+Future<void> registerCurrentUserForEntrig() async {
+  try {
+    final currentUser = supabase.auth.currentUser;
+
+    if (currentUser == null) return;
+
+    await Entrig.register(
+      userId: currentUser.id,
+    );
+
+    debugPrint('Entrig device registered for user: ${currentUser.id}');
+  } catch (e) {
+    debugPrint('Entrig registration error: $e');
+  }
+}
+
+void listenForEntrigAuthChanges() {
+  entrigAuthSubscription = supabase.auth.onAuthStateChange.listen((data) async {
+    try {
+      final session = data.session;
+      final user = session?.user;
+
+      if (user != null) {
+        await Entrig.register(
+          userId: user.id,
+        );
+
+        debugPrint('Entrig device registered after auth change: ${user.id}');
+      } else {
+        await Entrig.unregister();
+
+        debugPrint('Entrig device unregistered after logout');
+      }
+    } catch (e) {
+      debugPrint('Entrig auth listener error: $e');
+    }
+  });
+}
+
+void listenForEntrigNotificationOpen() {
+  entrigNotificationOpenSubscription =
+      Entrig.onNotificationOpened.listen((event) {
+        try {
+          debugPrint('Entrig notification opened: ${event.type}');
+          debugPrint('Entrig notification data: ${event.data}');
+
+          final notificationType = event.type;
+
+          if (notificationType == 'medicine_reminder') {
+            navigatorKey.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => const PatientHomePage(),
+              ),
+                  (route) => false,
+            );
+
+            return;
+          }
+
+          if (notificationType == 'appointment_accepted' ||
+              notificationType == 'zoom_link_added') {
+            navigatorKey.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => const PatientHomePage(),
+              ),
+                  (route) => false,
+            );
+
+            return;
+          }
+
+          if (notificationType == 'new_consultation_request') {
+            navigatorKey.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => const DoctorHomePage(),
+              ),
+                  (route) => false,
+            );
+
+            return;
+          }
+        } catch (e) {
+          debugPrint('Entrig notification open error: $e');
+        }
+      });
+}
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -199,8 +291,10 @@ class _AuthSessionCheckerState extends State<AuthSessionChecker> {
       );
       return;
     }
-
     try {
+      await Entrig.register(
+        userId: currentUser.id,
+      );
       final profile = await supabase
           .from('user_profiles')
           .select('role')
@@ -226,6 +320,7 @@ class _AuthSessionCheckerState extends State<AuthSessionChecker> {
           ),
         );
       } else {
+        await Entrig.unregister();
         await supabase.auth.signOut();
 
         if (!mounted) return;
@@ -236,6 +331,7 @@ class _AuthSessionCheckerState extends State<AuthSessionChecker> {
         );
       }
     } catch (e) {
+      await Entrig.unregister();
       await supabase.auth.signOut();
 
       if (!mounted) return;
