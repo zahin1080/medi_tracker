@@ -159,20 +159,20 @@ class _MyAppState extends State<MyApp> {
         uri.host == 'login-callback') {
       try {
         isResetPasswordFlow = true;
-
+        await Future.delayed(const Duration(milliseconds: 200));
         await supabase.auth.getSessionFromUrl(uri);
-
+        debugPrint('Recovery session created successfully');
+      }catch (e) {
+        debugPrint('Recovery session error: $e');
+      }
         navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (context) => const ResetPasswordPage(),
           ),
               (route) => false,
         );
-      } catch (e) {
-        debugPrint('Recovery session error: $e');
       }
     }
-  }
 
   @override
   void dispose() {
@@ -207,17 +207,23 @@ class _AppStartPageState extends State<AppStartPage> {
   }
 
   Future<void> startApp() async {
-    await Future.delayed(const Duration(milliseconds: 50));
+    await Future.delayed(const Duration(milliseconds: 200));
 
     try {
       final Uri? initialUri = await appLinks.getInitialLink();
+      debugPrint('Initial URI: $initialUri');
 
       if (initialUri != null &&
           initialUri.scheme == 'com.example.meditracker' &&
           initialUri.host == 'login-callback') {
         isResetPasswordFlow = true;
 
-        await supabase.auth.getSessionFromUrl(initialUri);
+        try {
+          await supabase.auth.getSessionFromUrl(initialUri);
+          debugPrint('Initial recovery session created successfully');
+        } catch (e) {
+          debugPrint('Initial recovery link error: $e');
+        }
 
         if (!mounted) return;
 
@@ -231,7 +237,7 @@ class _AppStartPageState extends State<AppStartPage> {
         return;
       }
     } catch (e) {
-      debugPrint('Initial recovery link error: $e');
+      debugPrint('Initial link read error: $e');
     }
 
     if (!mounted) return;
@@ -273,10 +279,19 @@ class _AuthSessionCheckerState extends State<AuthSessionChecker> {
 
   Future<void> checkLoginSession() async {
     if (isResetPasswordFlow) {
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ResetPasswordPage(),
+        ),
+      );
+
       return;
     }
 
-    await Future.delayed(const Duration(milliseconds: 50));
+    await Future.delayed(const Duration(milliseconds: 200));
 
     final session = supabase.auth.currentSession;
 
