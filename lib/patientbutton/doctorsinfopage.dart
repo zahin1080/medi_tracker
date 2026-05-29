@@ -15,15 +15,26 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
   bool isLoading = false;
   List<Map<String, dynamic>> doctors = [];
 
-  Map<String, bool> consultationSent = {};
-
   StreamSubscription? requestSubscription;
+
+  final Set<String> sentDoctorIds = {};
+  final Set<String> acceptedDoctorIds = {};
+  final Set<String> openedAcceptedRequestIds = {};
+  final Set<String> openedAcceptedDoctorIds = {};
+
+  final Map<String, String> previousRequestStatus = {};
+
+  bool isInitialRequestSnapshot = true;
 
   @override
   void initState() {
     super.initState();
-    fetchDoctors();
-    listenForAcceptedRequests();
+    initializePage();
+  }
+
+  Future<void> initializePage() async {
+    await fetchDoctors();
+    listenForConsultationRequests();
   }
 
   @override
@@ -33,6 +44,8 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
   }
 
   Future<void> fetchDoctors() async {
+    if (!mounted) return;
+
     setState(() {
       isLoading = true;
     });
@@ -48,36 +61,104 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
         return doctor;
       }).toList();
 
+      if (!mounted) return;
+
       setState(() {
         doctors = mergedDoctors;
       });
     } catch (e) {
       showMessage('Failed to load doctors: $e');
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
-  void listenForAcceptedRequests() {
+  void listenForConsultationRequests() {
     final currentUser = supabase.auth.currentUser;
 
     if (currentUser == null) return;
+
+    requestSubscription?.cancel();
 
     requestSubscription = supabase
         .from('consultation_requests')
         .stream(primaryKey: ['id'])
         .eq('patient_user_id', currentUser.id)
-        .listen((requests) {
-      for (final request in requests) {
-        if (request['status'] == 'accepted' &&
-            request['zoom_meeting_link'] != null &&
-            request['zoom_meeting_link'].toString().isNotEmpty) {
-          openZoomLink(request['zoom_meeting_link']);
+        .listen(
+          (requests) {
+        bool needRefresh = false;
+
+        for (final request in requests) {
+          final requestId = request['id']?.toString();
+          final doctorId = request['doctor_user_id']?.toString();
+          final status = request['status']?.toString();
+
+          if (requestId == null || doctorId == null || status == null) {
+            continue;
+          }
+
+          final oldStatus = previousRequestStatus[requestId];
+
+          if (status == 'pending') {
+            sentDoctorIds.add(doctorId);
+            needRefresh = true;
+          }
+
+          if (status == 'accepted') {
+            sentDoctorIds.add(doctorId);
+            acceptedDoctorIds.add(doctorId);
+            needRefresh = true;
+
+            final bool becameAccepted =
+                !isInitialRequestSnapshot && oldStatus != 'accepted';
+
+            final bool notOpenedBefore =
+                !openedAcceptedRequestIds.contains(requestId) &&
+                    !openedAcceptedDoctorIds.contains(doctorId);
+
+            if (becameAccepted && notOpenedBefore) {
+              openedAcceptedRequestIds.add(requestId);
+              openedAcceptedDoctorIds.add(doctorId);
+
+              final doctor = findDoctorById(doctorId);
+              final calendlyLink = doctor?['calendly_link'];
+
+              if (calendlyLink != null &&
+                  calendlyLink.toString().trim().isNotEmpty) {
+                openCalendlyLink(calendlyLink.toString());
+              } else {
+                showMessage('Calendly link is not available for this doctor');
+              }
+            }
+          }
+
+          previousRequestStatus[requestId] = status;
         }
-      }
-    });
+
+        isInitialRequestSnapshot = false;
+
+        if (mounted && needRefresh) {
+          setState(() {});
+        }
+      },
+      onError: (error) {
+        showMessage('Request listener error: $error');
+      },
+    );
+  }
+
+  Map<String, dynamic>? findDoctorById(String doctorId) {
+    try {
+      return doctors.firstWhere(
+            (doctor) => doctor['user_id'].toString() == doctorId,
+      );
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<void> sendConsultationRequest(Map<String, dynamic> doctor) async {
@@ -89,43 +170,103 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
         return;
       }
 
+      final doctorUserId = doctor['user_id']?.toString();
+
+      if (doctorUserId == null || doctorUserId.isEmpty) {
+        showMessage('Doctor ID not found');
+        return;
+      }
+
+      if (acceptedDoctorIds.contains(doctorUserId)) {
+        final calendlyLink = doctor['calendly_link'];
+
+        if (calendlyLink != null &&
+            calendlyLink.toString().trim().isNotEmpty) {
+          await openCalendlyLink(calendlyLink.toString());
+        } else {
+          showMessage('Calendly link is not available');
+        }
+
+        return;
+      }
+
+      if (sentDoctorIds.contains(doctorUserId)) {
+        showMessage('Consultation request already sent. Please wait for doctor approval.');
+        return;
+      }
+
+      final existingData = await supabase
+          .from('consultation_requests')
+          .select('id, status, doctor_user_id')
+          .eq('patient_user_id', currentUser.id)
+          .eq('doctor_user_id', doctorUserId)
+          .limit(1);
+
+      final existingRequests = List<Map<String, dynamic>>.from(existingData);
+
+      if (existingRequests.isNotEmpty) {
+        final existingStatus = existingRequests.first['status']?.toString();
+
+        sentDoctorIds.add(doctorUserId);
+
+        if (existingStatus == 'accepted') {
+          acceptedDoctorIds.add(doctorUserId);
+
+          if (mounted) {
+            setState(() {});
+          }
+
+          final calendlyLink = doctor['calendly_link'];
+
+          if (calendlyLink != null &&
+              calendlyLink.toString().trim().isNotEmpty) {
+            await openCalendlyLink(calendlyLink.toString());
+          } else {
+            showMessage('Calendly link is not available');
+          }
+
+          return;
+        }
+
+        if (mounted) {
+          setState(() {});
+        }
+
+        showMessage('Consultation request already sent. Please wait for doctor approval.');
+        return;
+      }
+
       final doctorName = doctor['doctor_name'] ?? 'Unknown Doctor';
 
       await supabase.from('consultation_requests').insert({
         'patient_user_id': currentUser.id,
-        'doctor_user_id': doctor['user_id'],
+        'doctor_user_id': doctorUserId,
         'status': 'pending',
         'zoom_meeting_link': doctor['zoom_meeting_link'],
       });
 
+      if (!mounted) return;
+
       setState(() {
-        consultationSent[doctor['user_id'].toString()] = true;
+        sentDoctorIds.add(doctorUserId);
       });
 
       showMessage(
-        'Consultation request sent to $doctorName. Calendly link is now available.',
+        'Consultation request sent to $doctorName. Calendly link will open after doctor accepts.',
       );
     } catch (e) {
       showMessage('Failed to send request: $e');
     }
   }
 
-  Future<void> openZoomLink(String link) async {
-    final uri = Uri.parse(link);
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-    } else {
-      showMessage('Could not open Zoom meeting link');
-    }
-  }
-
-  Future<void> openCalendlyLink(String link) async {
+  Future<void> openCalendlyLink(dynamic link) async {
     try {
-      String fixedLink = link.trim();
+      if (link == null || link.toString().trim().isEmpty) {
+        showMessage('Calendly link is not available');
+        return;
+      }
+
+      String fixedLink = link.toString().trim();
 
       if (!fixedLink.startsWith('http://') &&
           !fixedLink.startsWith('https://')) {
@@ -140,14 +281,10 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
       );
 
       if (!launched) {
-        throw Exception('Launch failed');
+        showMessage('Could not open Calendly link');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open Calendly link'),
-        ),
-      );
+      showMessage('Could not open Calendly link: $e');
     }
   }
 
@@ -203,8 +340,14 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
               doctor['doctor_name'] ?? 'Unknown Doctor';
 
           final doctorUserId = doctor['user_id'].toString();
-          final canOpenCalendly =
-              consultationSent[doctorUserId] == true;
+
+          final bool isSent =
+          sentDoctorIds.contains(doctorUserId);
+
+          final bool isAccepted =
+          acceptedDoctorIds.contains(doctorUserId);
+
+          final bool canOpenCalendly = isAccepted;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
@@ -228,8 +371,8 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
                   children: [
                     CircleAvatar(
                       radius: 28,
-                      backgroundColor:
-                      const Color(0xFF8E6FF7).withOpacity(0.12),
+                      backgroundColor: const Color(0xFF8E6FF7)
+                          .withOpacity(0.12),
                       child: const Icon(
                         Icons.person,
                         color: Color(0xFF7B5EF2),
@@ -273,15 +416,25 @@ class _DoctorsInfoPageState extends State<DoctorsInfoPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
+                    onPressed: isSent || isAccepted
+                        ? null
+                        : () {
                       sendConsultationRequest(doctor);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8E6FF7),
+                      backgroundColor: isSent || isAccepted
+                          ? Colors.grey
+                          : const Color(0xFF8E6FF7),
                       foregroundColor: Colors.white,
                     ),
                     icon: const Icon(Icons.video_call),
-                    label: const Text('Book Consultant'),
+                    label: Text(
+                      isAccepted
+                          ? 'Request Accepted'
+                          : isSent
+                          ? 'Request Sent'
+                          : 'Book Consultant',
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),

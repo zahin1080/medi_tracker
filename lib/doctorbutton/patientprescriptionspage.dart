@@ -20,6 +20,8 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptionsPage> {
   }
 
   Future<void> fetchAcceptedPatients() async {
+    if (!mounted) return;
+
     setState(() {
       isLoading = true;
     });
@@ -27,15 +29,31 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptionsPage> {
     try {
       final data = await supabase.rpc('get_accepted_patients_for_doctor');
 
+      final rawPatients = List<Map<String, dynamic>>.from(data);
+
+      final Map<String, Map<String, dynamic>> uniquePatients = {};
+
+      for (final patient in rawPatients) {
+        final patientId = patient['patient_user_id']?.toString();
+
+        if (patientId == null || patientId.isEmpty) continue;
+
+        uniquePatients[patientId] = patient;
+      }
+
+      if (!mounted) return;
+
       setState(() {
-        patients = List<Map<String, dynamic>>.from(data);
+        patients = uniquePatients.values.toList();
       });
     } catch (e) {
       showMessage('Failed to load patients: $e');
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -169,8 +187,9 @@ class _PatientPrescriptionImagesPageState
     super.initState();
     fetchPrescriptions();
   }
-
   Future<void> fetchPrescriptions() async {
+    if (!mounted) return;
+
     setState(() {
       isLoading = true;
     });
@@ -183,15 +202,33 @@ class _PatientPrescriptionImagesPageState
         },
       );
 
+      final rawPrescriptions = List<Map<String, dynamic>>.from(data);
+
+      final Map<String, Map<String, dynamic>> uniquePrescriptions = {};
+
+      for (final prescription in rawPrescriptions) {
+        final key = prescription['id']?.toString() ??
+            prescription['prescription_id']?.toString() ??
+            prescription['image_url']?.toString();
+
+        if (key == null || key.isEmpty) continue;
+
+        uniquePrescriptions[key] = prescription;
+      }
+
+      if (!mounted) return;
+
       setState(() {
-        prescriptions = List<Map<String, dynamic>>.from(data);
+        prescriptions = uniquePrescriptions.values.toList();
       });
     } catch (e) {
       showMessage('Failed to load prescriptions: $e');
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
