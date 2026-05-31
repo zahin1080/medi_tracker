@@ -682,7 +682,7 @@ class _MedicineReminderPageState extends State<MedicineReminderPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Stock Analysis Dashboard',
+                  'Stock Insights',
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
