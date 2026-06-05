@@ -166,7 +166,7 @@ class _MedicineInventoryPageState extends State<MedicineInventoryPage> {
               ),
               TextField(
                 controller: doseController,
-                decoration: const InputDecoration(labelText: 'Dose / Power'),
+                decoration: const InputDecoration(labelText: 'Power'),
               ),
               TextField(
                 controller: stockController,
@@ -229,7 +229,7 @@ class _MedicineInventoryPageState extends State<MedicineInventoryPage> {
               ),
               TextField(
                 controller: doseController,
-                decoration: const InputDecoration(labelText: 'Dose / Power'),
+                decoration: const InputDecoration(labelText: 'Power'),
               ),
               TextField(
                 controller: stockController,
@@ -285,7 +285,7 @@ class _MedicineInventoryPageState extends State<MedicineInventoryPage> {
           controller: reduceController,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-            labelText: 'How many doses/counts to reduce?',
+            labelText: 'How many counts to reduce?',
           ),
         ),
         actions: [
@@ -440,7 +440,7 @@ class _MedicineInventoryPageState extends State<MedicineInventoryPage> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Dose / Power: ${medicine['dose_power'] ?? ''}',
+                          'Power: ${medicine['dose_power'] ?? ''}',
                           style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF777777),
